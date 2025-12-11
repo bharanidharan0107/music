@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>My Spotify Clone — 180 Songs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* (same styling as before, condensed for brevity) */
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#000;--accent:#1db954;--muted:#b3b3b3;--card:#111}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto;min-height:100vh;background:#050505;color:#fff;display:flex;align-items:stretch}
+    .container{display:grid;grid-template-columns:260px 1fr;gap:12px;width:100%;padding:12px}
+    .sidebar{background:#070707;padding:14px;border-radius:12px;border:1px solid #151515}
+    .main{background:#080808;padding:14px;border-radius:12px;border:1px solid #151515;display:flex;flex-direction:column}
+    .player{position:fixed;left:300px;right:12px;bottom:12px;background:#070707;padding:12px;border-radius:12px;border:1px solid #151515;display:flex;align-items:center;gap:12px}
+    .song-list{margin-top:12px;overflow:auto;height:60vh;border-radius:10px;border:1px solid #1a1a1a;padding:6px}
+    .song-row{display:grid;grid-template-columns:40px 1fr 160px 60px;gap:8px;padding:8px;align-items:center;border-radius:6px}
+    .song-row:nth-child(even){background:#0b0b0b}
+    .song-row:hover{background:#11331122;cursor:pointer}
+    .active{background:#1db95433 !important}
+    input[type="search"]{width:100%;padding:8px;border-radius:999px;border:1px solid #222;background:#0d0d0d;color:#fff}
+    .controls{display:flex;align-items:center;gap:8px}
+    button{background:transparent;border:none;color:inherit;cursor:pointer;font-size:18px}
+    .play-btn{width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#000;font-weight:700}
+    .progress{flex:1;height:6px;background:#222;border-radius:999px;position:relative}
+    .progress > .bar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent),#1ed760);width:0;border-radius:inherit}
+    @media(max-width:900px){.container{grid-template-columns:1fr}.player{left:12px;right:12px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <h3>My Music</h3>
+      <div style="margin-top:12px">
+        <div>Tracks in list: <strong id="playlistCount">0</strong></div>
+        <div style="margin-top:8px;color:#b3b3b3;font-size:13px">Local files only — upload them to /music/</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header style="display:flex;gap:12px;align-items:center;justify-content:space-between">
+        <div>
+          <h2>Your Songs</h2>
+          <div style="color:var(--muted);font-size:13px">Search and play your local files</div>
+        </div>
+        <div style="width:360px">
+          <input id="searchInput" type="search" placeholder="Search by title or artist..." />
+        </div>
+      </header>
+
+      <section class="song-list" id="songList">
+        <!-- rows injected here -->
+      </section>
+      <div id="emptyState" style="display:none;margin-top:12px;color:var(--muted)">No songs found. Edit the songs array in the HTML or upload your mp3 files to /music/.</div>
+    </main>
+  </div>
+
+  <!-- Player -->
+  <div class="player" role="region" aria-label="Player">
+    <div style="display:flex;align-items:center;gap:10px;min-width:220px">
+      <div id="cover" style="width:48px;height:48px;border-radius:8px;background:#0f0f0f;display:flex;align-items:center;justify-content:center;font-weight:700">Y</div>
+      <div style="min-width:0">
+        <div id="nowTitle" style="font-weight:700">Nothing playing</div>
+        <div id="nowArtist" style="color:var(--muted);font-size:13px">Choose a song</div>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;margin-left:8px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px" class="controls">
+        <button id="prevBtn" title="Previous">⏮</button>
+        <button id="playBtn" class="play-btn" title="Play/Pause">▶</button>
+        <button id="nextBtn" title="Next">⏭</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="curTime" style="width:40px;text-align:center;color:var(--muted)">0:00</div>
+        <div class="progress" id="progressBar" title="Seek">
+          <div class="bar" id="progressFill"></div>
+        </div>
+        <div id="durTime" style="width:40px;text-align:center;color:var(--muted)">0:00</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-left:8px">
+      <span style="color:var(--muted)">🔊</span>
+      <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" />
+    </div>
+  </div>
+
+  <audio id="audio"></audio>
+
+  <script>
+    // ----------------------------
+    // SONGS ARRAY (180 items)
+    // Make sure files exist in /music/ on your GitHub repo.
+    // First item is your uploaded Yaanji file.
+    // ----------------------------
+    const songs = [
+      { id:1, title:"Yaanji", artist:"Your Local File", file:"music/Yaanji-MassTamilan.com.mp3", duration:"4:37" },
+    ];
+
+    // Add remaining 179 placeholder entries (Song 2..Song 180).
+    for (let i=2;i<=180;i++){
+      songs.push({
+        id:i,
+        title:`Song ${i}`,
+        artist:`Your Artist ${i}`,
+        file:`music/song${i}.mp3`, // change these paths if you have real files
+        duration: "3:30"
+      });
+    }
+
+    // ----------------------------
+    // BASIC PLAYER LOGIC
+    // ----------------------------
+    const audio = document.getElementById("audio");
+    const listEl = document.getElementById("songList");
+    const searchInput = document.getElementById("searchInput");
+    const playlistCount = document.getElementById("playlistCount");
+    const emptyState = document.getElementById("emptyState");
+
+    const nowTitle = document.getElementById("nowTitle");
+    const nowArtist = document.getElementById("nowArtist");
+    const cover = document.getElementById("cover");
+
+    const playBtn = document.getElementById("playBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const vol = document.getElementById("vol");
+
+    const progressBar = document.getElementById("progressBar");
+    const progressFill = document.getElementById("progressFill");
+    const curTime = document.getElementById("curTime");
+    const durTime = document.getElementById("durTime");
+
+    let filtered = [...songs];
+    let currentIndex = 0;
+    let isPlaying = false;
+
+    function formatTime(sec){
+      if (!sec || isNaN(sec)) return "0:00";
+      const m = Math.floor(sec/60);
+      const s = Math.floor(sec%60);
+      return `${m}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function renderList(){
+      listEl.innerHTML = "";
+      if (!filtered.length){
+        emptyState.style.display="block";
+      } else {
+        emptyState.style.display="none";
+      }
+      filtered.forEach((s, idx)=>{
+        const row = document.createElement("div");
+        row.className = "song-row";
+        row.dataset.filteredIndex = idx;
+        row.innerHTML = `
+          <div style="text-align:center;color:var(--muted)">${idx+1}</div>
+          <div style="min-width:0;overflow:hidden;text-overflow:ellipsis">${s.title}</div>
+          <div style="color:var(--muted);overflow:hidden;text-overflow:ellipsis">${s.artist}</div>
+          <div style="text-align:right;color:var(--muted)">${s.duration||''}</div>
+        `;
+        row.addEventListener("click", ()=>playByFiltered(idx));
+        listEl.appendChild(row);
+      });
+      playlistCount.textContent = songs.length;
+      updateActiveRow();
+    }
+
+    function updateActiveRow(){
+      const rows = document.querySelectorAll(".song-row");
+      rows.forEach(r=>r.classList.remove("active"));
+      const global = songs[currentIndex];
+      const fi = filtered.indexOf(global);
+      if (fi>=0){
+        const row = rows[fi];
+        if (row) row.classList.add("active");
+      }
+    }
+
+    function loadSong(index){
+      if (index<0 || index>=songs.length) return;
+      currentIndex = index;
+      const s = songs[currentIndex];
+      // use encodeURI to avoid issues with spaces and special chars
+      audio.src = encodeURI(s.file);
+      nowTitle.textContent = s.title;
+      nowArtist.textContent = s.artist;
+      cover.textContent = s.title && s.title[0].toUpperCase() || "♪";
+      updateActiveRow();
+    }
+
+    function play(){
+      if (!audio.src){
+        if (!songs.length) return;
+        loadSong(0);
+      }
+      audio.play().then(()=>{
+        isPlaying=true;
+        playBtn.textContent="⏸";
+      }).catch(err=>{
+        console.error("Play error:",err);
+        alert("Could not play the audio. Make sure the file is uploaded to your repo in the /music/ folder and the path is correct.");
+      });
+    }
+
+    function pause(){
+      audio.pause();
+      isPlaying=false;
+      playBtn.textContent="▶";
+    }
+
+    function togglePlay(){ isPlaying ? pause() : play() }
+
+    function playByFiltered(filteredIndex){
+      const s = filtered[filteredIndex];
+      const gi = songs.indexOf(s);
+      if (gi>=0){
+        loadSong(gi);
+        play();
+      }
+    }
+
+    function nextSong(){
+      let ni = currentIndex + 1;
+      if (ni >= songs.length) ni = 0;
+      loadSong(ni);
+      play();
+    }
+    function prevSong(){
+      let pi = currentIndex - 1;
+      if (pi < 0) pi = songs.length - 1;
+      loadSong(pi);
+      play();
+    }
+
+    // Search
+    searchInput.addEventListener("input", ()=>{
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) filtered = [...songs];
+      else filtered = songs.filter(s=> (s.title||'').toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q));
+      renderList();
+    });
+
+    // audio events
+    audio.addEventListener("timeupdate", ()=>{
+      curTime.textContent = formatTime(audio.currentTime);
+      durTime.textContent = formatTime(audio.duration);
+      const pct = audio.duration ? (audio.currentTime/audio.duration)*100 : 0;
+      progressFill.style.width = pct + "%";
+    });
+    audio.addEventListener("loadedmetadata", ()=> {
+      durTime.textContent = formatTime(audio.duration);
+    });
+    audio.addEventListener("ended", ()=> {
+      nextSong();
+    });
+
+    progressBar.addEventListener("click",(e)=>{
+      const rect = progressBar.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      if (!isNaN(audio.duration)) audio.currentTime = audio.duration * ratio;
+    });
+
+    vol.addEventListener("input", ()=> audio.volume = parseFloat(vol.value));
+
+    playBtn.addEventListener("click", togglePlay);
+    nextBtn.addEventListener("click", nextSong);
+    prevBtn.addEventListener("click", prevSong);
+
+    document.addEventListener("keydown", (e)=>{
+      if (e.code==="Space" && e.target===document.body){ e.preventDefault(); togglePlay() }
+      if (e.code==="ArrowRight") nextSong();
+      if (e.code==="ArrowLeft") prevSong();
+    });
+
+    // initial render
+    filtered = [...songs];
+    renderList();
+    // load first song metadata but do not autoplay (browsers block autoplay)
+    if (songs.length) loadSong(0);
+
+  </script>
+</body>
+</html>
